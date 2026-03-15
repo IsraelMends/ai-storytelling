@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function handleGenerate(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const { prompt, context } = await request.json();
 
@@ -23,7 +23,7 @@ export async function handleGenerate(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Barrear ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -42,11 +42,11 @@ export async function handleGenerate(request: NextRequest) {
     });
 
     const data = await response.json();
-    const text = data.choises?.[0]?.message?.content?.trim() ?? "";
+    const text = data.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!text) {
       return NextResponse.json(
-        { error: "Responsta vazia da IA" },
+        { error: "Resposta vazia da IA" },
         { status: 500 }
       );
     }
@@ -54,8 +54,8 @@ export async function handleGenerate(request: NextRequest) {
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { error: "Erro ao gerar text" },
-      {status:500}
-    )
+      { error: "Erro ao gerar texto" },
+      { status: 500 }
+    );
   }
 }
