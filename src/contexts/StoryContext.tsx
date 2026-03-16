@@ -58,7 +58,9 @@ export interface StoryContextValue {
   currentStory: Story;
   currentNodeId: NodeId;
   setCurrentNodeId: (id: NodeId) => void;
-  addNodeFromPrompt: (prompt: string) => Promise<{ ok: true; nodeId: string } | { ok: false; error: string }>
+  addNodeFromPrompt: (
+    prompt: string
+  ) => Promise<{ nodeId: string } | { error: string }>;
 }
 
 // 3) Criação do contexto
@@ -68,62 +70,65 @@ const StoryContext = createContext<StoryContextValue | undefined>(undefined);
 
 // 4) Provider
 export function StoryProvider({ children }: { children: ReactNode }) {
-  const [currentNodeId, setCurrentNodeId] = useState<NodeId>('start');
-  const [story, setStory] = useState<Story>(exampleStory)
+  const [currentNodeId, setCurrentNodeId] = useState<NodeId>("start");
+  const [story, setStory] = useState<Story>(exampleStory);
 
-  const addNodeFromPrompt = async (prompt: string) => {
-
+  const addNodeFromPrompt = async (
+    prompt: string
+  ): Promise<{ nodeId: string } | { error: string }> => {
     const currentNode = story.nodes.find((n) => n.id === currentNodeId);
     const context = currentNode ? currentNode.text : undefined;
 
     const res = await fetch("/api/ai/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, context })
+      body: JSON.stringify({ prompt, context }),
     });
 
     const data = await res.json();
 
-    if (!res.ok) return { error: data.error || "Error desconhecido" };
+    if (!res.ok) {
+      return { error: data.error || "Erro desconhecido ao gerar texto com IA" };
+    }
 
-    const text = data.text
+    const text: string | undefined = data.text;
 
     if (!text) {
-      error: 'Resposta vazia da IA'
+      return { error: "Resposta vazia da IA" };
     }
 
     const newId = `node-${Date.now()}`;
 
     const newNode: StoryNode = {
-      id: `node-${Date.now()}`,
+      id: newId,
       title: prompt.slice(0, 30),
-      text: data.text,
+      text,
       createdAt: new Date().toISOString(),
-    }
+    };
 
     const newEdge: StoryEdge = {
       id: `edge-${Date.now()}`,
       from: currentNodeId,
       to: newId,
-      label: prompt.slice(0, 30)
-    }
+      label: prompt.slice(0, 30),
+    };
 
     setStory((prev) => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
-      edges: [...prev.edges, newEdge]
-    }))
+      edges: [...prev.edges, newEdge],
+    }));
 
-    setCurrentNodeId(newId)
-    return { nodeId: newId }
-  }
+    setCurrentNodeId(newId);
+    return { nodeId: newId };
+  };
 
   const value: StoryContextValue = {
     currentStory: story,
     currentNodeId,
     setCurrentNodeId,
-    addNodeFromPrompt: addNodeFromPrompt as (prompt: string) => Promise<{ ok: true; nodeId: string } | { ok: false; error: string }>
-  }
+    addNodeFromPrompt,
+  };
 
   return (
     <StoryContext.Provider value={value}>
