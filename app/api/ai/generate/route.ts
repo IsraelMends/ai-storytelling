@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 
+type OpenRouterErrorShape = {
+  error?: { message?: string } | string;
+};
+
+function readErrorMessage(data: unknown) {
+  if (typeof data !== "object" || data === null) return null;
+  const err = (data as OpenRouterErrorShape).error;
+  if (typeof err === "string") return err;
+  if (typeof err === "object" && err && typeof err.message === "string") return err.message;
+  return null;
+}
+
+function partToText(part: unknown) {
+  if (typeof part === "string") return part;
+  if (typeof part !== "object" || part === null) return "";
+  const rec = part as Record<string, unknown>;
+  if (typeof rec.text === "string") return rec.text;
+  if (typeof rec.content === "string") return rec.content;
+  return "";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { prompt, context } = await request.json();
@@ -55,9 +76,7 @@ const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
 
     if (!response.ok) {
       const message =
-        (data as any)?.error?.message ||
-        (data as any)?.error ||
-        "Erro ao se comunicar com o provedor de IA";
+        readErrorMessage(data) ?? "Erro ao se comunicar com o provedor de IA";
 
       const friendlyMessage =
         response.status === 429
@@ -84,25 +103,18 @@ const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     } else if (Array.isArray(rawContent)) {
       // Alguns provedores retornam a mensagem como array de partes
       text = rawContent
-        .map((part: any) => {
-          if (typeof part === "string") return part;
-          if (part?.text) return part.text;
-          if (part?.content) return part.content;
-          return "";
-        })
+        .map(partToText)
         .join(" ")
         .trim();
     } else if (rawContent && typeof rawContent === "object") {
       // Outros retornam como objeto com campo `text` ou `content`
       text =
-        (rawContent as any).text ??
-        (rawContent as any).content ??
+        ((rawContent as Record<string, unknown>).text as string | undefined) ??
+        ((rawContent as Record<string, unknown>).content as string | undefined) ??
         "";
-      if (Array.isArray((rawContent as any).parts)) {
-        const extra = (rawContent as any).parts
-          .map((p: any) => p?.text ?? "")
-          .join(" ")
-          .trim();
+      const parts = (rawContent as Record<string, unknown>).parts;
+      if (Array.isArray(parts)) {
+        const extra = parts.map(partToText).join(" ").trim();
         text = `${text ?? ""} ${extra}`.trim();
       }
     }
@@ -116,7 +128,7 @@ const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     }
 
     return NextResponse.json({ text });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
     return NextResponse.json(
       { error: "Erro ao gerar texto" },
