@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//MODELS
+
+model Story {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdBy   String?
+  isPublic    Boolean     @default(false)
+  storyNodes  StoryNode[]
+  storyEdges  StoryEdge[]
+}
+
+model StoryNode {
+  id        String   @id @default(cuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id])
+  title     String
+  text      String
+  isStart   Boolean  @default(false)
+  isEnding  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  createdBy String?
+}
+
+model StoryEdge {
+  id         String   @id @default(cuid())
+  storyId    String
+  story      Story    @relation(fields: [storyId], references: [id])
+  fromNodeId String
+  toNodeId   String
+  label      String
+  createdAt  DateTime @default(now())
+}
