@@ -12,7 +12,7 @@ const HORIZONTAL_GAP = 140;
 const VERTICAL_GAP = 110;
 
 export function StoryTree() {
-  const { currentStory } = useStory();
+  const { currentStory, currentNodeId } = useStory();
 
   // Profissionalização: tratamento para histórias ou edges indefinidos/vazios
   const { nodes, edges } = useMemo(() => {
@@ -20,27 +20,36 @@ export function StoryTree() {
     const storyEdges = Array.isArray(currentStory?.edges) ? currentStory.edges : [];
 
     // Layout automático grid simples (pode evoluir para tree layout no futuro)
-    const flowNodes: Node[] = storyNodes.map((node, index) => ({
-      id: node.id,
-      type: 'default',
-      position: {
-        x: (index % 4) * (NODE_WIDTH + HORIZONTAL_GAP),
-        y: Math.floor(index / 4) * (NODE_HEIGHT + VERTICAL_GAP),
-      },
-      data: {
-        label: node.title && node.title.trim().length > 0
-          ? node.title
-          : (node.text?.slice(0, 30) || 'Novo Nó') + (node.text?.length > 30 ? '...' : ''),
-      },
-      style: {
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-        border: '1.5px solid #64748b',
-        borderRadius: 8,
-        background: '#f7fafc',
-        fontSize: 14,
-      },
-    }));
+    const flowNodes: Node[] = storyNodes.map((node, index) => {
+      const isCurrent = node.id === currentNodeId;
+
+      return {
+        id: node.id,
+        type: 'default',
+        position: {
+          x: (index % 4) * (NODE_WIDTH + HORIZONTAL_GAP),
+          y: Math.floor(index / 4) * (NODE_HEIGHT + VERTICAL_GAP),
+        },
+        data: {
+          label: node.title && node.title.trim().length > 0
+            ? node.title
+            : (node.text?.slice(0, 30) || 'Novo Nó') + (node.text?.length > 30 ? '...' : ''),
+        },
+        style: {
+          width: NODE_WIDTH,
+          height: NODE_HEIGHT,
+          border: isCurrent ? '2px solid #38bdf8' : '1.5px solid #64748b',
+          borderRadius: 8,
+          background: isCurrent ? '#0f172a' : '#f7fafc',
+          color: isCurrent ? '#f9fafb' : '#020617',
+          fontSize: 14,
+          boxShadow: isCurrent
+            ? '0 0 0 1px rgba(56,189,248,0.5), 0 10px 30px rgba(15,23,42,0.45)'
+            : '0 2px 12px 0 rgba(30,41,59,0.08)',
+          transition: 'box-shadow 150ms ease-out, transform 150ms ease-out',
+        },
+      };
+    });
 
     const flowEdges: Edge[] = storyEdges.map((edge) => ({
       id: edge.id,
@@ -54,7 +63,7 @@ export function StoryTree() {
     }));
 
     return { nodes: flowNodes, edges: flowEdges };
-  }, [currentStory]);
+  }, [currentStory, currentNodeId]);
 
   return (
     <ReactFlowProvider>
