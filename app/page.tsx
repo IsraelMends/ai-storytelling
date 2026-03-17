@@ -17,12 +17,12 @@ export default function HomePage() {
   } = useStory();
 
   const currentNode = useMemo(
-    () => currentStory.nodes.find((n) => n.id === currentNodeId),
+    () => currentStory?.nodes.find((n) => n.id === currentNodeId),
     [currentStory, currentNodeId]
   );
 
   const outgoingEdges = useMemo(
-    () => currentStory.edges.filter((e) => e.from === currentNodeId),
+    () => currentStory?.edges.filter((e) => e.from === currentNodeId) ?? [],
     [currentStory, currentNodeId]
   );
 
@@ -32,6 +32,14 @@ export default function HomePage() {
       throw new Error(result.error);
     }
   };
+
+  if (!currentStory) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 p-8">
+        <p>Carregando história...</p>
+      </main>
+    );
+  }
 
   if (!currentNode) {
     return (

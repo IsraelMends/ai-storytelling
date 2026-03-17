@@ -20,8 +20,8 @@ export default function StoryPromptForm({ onSubmit, disabled = false }: StoryPro
     try {
       await onSubmit(prompt);
       setPrompt(""); // clear on success
-    } catch (e: any) {
-      setError(e?.message || "Erro ao enviar prompt");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erro ao enviar prompt");
     } finally {
       setLoading(false);
     }

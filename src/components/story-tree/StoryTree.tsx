@@ -88,7 +88,7 @@ export function StoryTree() {
           <Controls showInteractive={false} />
           <MiniMap
             pannable
-            nodeColor={n => '#2563eb'}
+            nodeColor={() => '#2563eb'}
             maskColor="rgba(30,41,59,0.05)"
           />
         </ReactFlow>

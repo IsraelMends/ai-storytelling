@@ -1,134 +1,155 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
-import type { Story, StoryId, NodeId, StoryNode, StoryEdge } from '../types/story'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { Story, StoryNode, StoryEdge } from '@/types/story';
+import * as storyService from '@/services/storyService';
 
-// 1) História de exemplo (hardcoded)
+type StoryContextValue = {
+  currentStory: Story | null;
+  nodes: StoryNode[];
+  edges: StoryEdge[];
+  currentNodeId: string | null;
+  loading: boolean;
+  error: string | null;
 
-const exampleNodes: StoryNode[] = [
-  {
-    id: 'start',
-    title: 'início na floresta',
-    text: 'Elena entra na floresta ao anoitecer e ouve um som distante entre as árvores',
-    isStart: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'follow-sound',
-    title: 'Seguir o som',
-    text: 'Ela decide seguir o som e encontra uma clareira iluminada por vagalumes.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'go-back',
-    title: 'Voltar para a vila',
-    text: 'Ela sente medo e decide voltar para a vila, mas percebe que o caminho mudou.',
-    createdAt: new Date().toISOString(),
-    isEnding: true,
-  }
-]
-
-const exampleEdges: StoryEdge[] = [
-  {
-    id: 'start->follow',
-    from: 'start',
-    to: 'follow-sound',
-    label: 'Seguir o som'
-  },
-  {
-    id: 'start->back',
-    from: 'start',
-    to: 'go-back',
-    label: 'Voltar para a vila'
-  }
-]
-
-const exampleStory: Story = {
-  id: 'demo-story' as StoryId,
-  title: 'A floresta da Elena',
-  description: 'Uma pequena história de exemplo para testar o fluxo',
-  nodes: exampleNodes,
-  edges: exampleEdges,
-  createdAt: new Date().toISOString(),
-  isPublic: false,
-}
-
-// 2) Tipagem do contexto
-export interface StoryContextValue {
-  currentStory: Story;
-  currentNodeId: NodeId;
-  setCurrentNodeId: (id: NodeId) => void;
-  addNodeFromPrompt: (
-    prompt: string
-  ) => Promise<{ nodeId: string } | { error: string }>;
+  setCurrentNodeId: (id: string) => void;
+  addNodeFromPrompt: (prompt: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 // 3) Criação do contexto
 const StoryContext = createContext<StoryContextValue | undefined>(undefined);
 
 
-
 // 4) Provider
-export function StoryProvider({ children }: { children: ReactNode }) {
-  const [currentNodeId, setCurrentNodeId] = useState<NodeId>("start");
-  const [story, setStory] = useState<Story>(exampleStory);
+export function StoryProvider({
+  children,
+  storyId: storyIdProp,
+}: {
+  children: React.ReactNode;
+  storyId?: string;
+}) {
 
-  const addNodeFromPrompt = async (
-    prompt: string
-  ): Promise<{ nodeId: string } | { error: string }> => {
-    const currentNode = story.nodes.find((n) => n.id === currentNodeId);
-    const context = currentNode ? currentNode.text : undefined;
+  const storyId = storyIdProp ?? "COLOQUE_UM_STORY_ID_AQUI";
 
-    const res = await fetch("/api/ai/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, context }),
-    });
+  const [currentStory, setCurrentStory] = useState<Story | null>(null);
+  const [nodes, setNodes] = useState<StoryNode[]>([]);
+  const [edges, setEdges] = useState<StoryEdge[]>([]);
+  const [currentNodeId, setCurrentNodeIdState] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const data = await res.json();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    if (!res.ok) {
-      return { error: data.error || "Erro desconhecido ao gerar texto com IA" };
+    try {
+      const data = await storyService.getStoryById(storyId);
+      setCurrentStory({
+        ...data.story,
+        nodes: data.nodes,
+        edges: data.edges,
+      });
+      setNodes(data.nodes);
+      setEdges(data.edges);
+      setCurrentNodeIdState(
+        data.currentNodeId ??
+          data.nodes.find((n) => n.isStart)?.id ??
+          data.nodes[0]?.id ??
+          null
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Falha ao carregar story');
+    } finally {
+      setLoading(false);
     }
+  }, [storyId]);
 
-    const text: string | undefined = data.text;
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-    if (!text) {
-      return { error: "Resposta vazia da IA" };
+  const setCurrentNodeId = (id: string) => setCurrentNodeIdState(id);
+
+  const addNodeFromPrompt: StoryContextValue["addNodeFromPrompt"] = useCallback(async (prompt) => {
+    try {
+      setError(null);
+
+      const fail = (msg: string) => {
+        setError(msg);
+        return { ok: false as const, error: msg };
+      };
+
+      if (!currentStory || !currentNodeId) {
+        return fail('Story não carregada');
+      }
+
+
+      // 1) Gerar conteúdo do novo nó
+      const baseNode = nodes.find((n) => n.id === currentNodeId);
+      if (!baseNode) return fail("Nó atual inválido");
+
+      const aiRes = await fetch("/api/ai/generate", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          context: { nodeTitle: baseNode.title, nodeText: baseNode.text },
+        }),
+      });
+
+      const aiJson = await aiRes.json();
+      if (!aiRes.ok) return fail(aiJson?.error ?? 'Falha ao gerar texto');
+
+      //Ajuste esse shape conforme o que sua rota realmente retorno:
+      const newTitle = aiJson?.title ?? 'Novo nó';
+      const newText = aiJson?.text ?? aiJson?.nodeText ?? aiJson?.context ?? '';
+      const edgeLabel = aiJson?.edgeLabel ?? 'prompt';
+
+      if (!newText) return fail('IA retornou texto vazio');
+
+      // 2) Persistir nó + aresta (atômico)
+      const { createdNode, createdEdge } = await storyService.appendNodeAndEdge({
+        storyId: currentStory.id,
+        baseNodeId: currentNodeId,
+        newNodeData: { title: newTitle, text: newText },
+        newEdgeLabel: edgeLabel,
+      });
+
+      // 3) Atualizar estado local (delta)
+      setNodes((prev) => [...prev, createdNode]);
+      setEdges((prev) => [...prev, createdEdge]);
+      setCurrentStory((prev) =>
+        prev
+          ? {
+              ...prev,
+              nodes: [...prev.nodes, createdNode],
+              edges: [...prev.edges, createdEdge],
+            }
+          : prev
+      );
+      setCurrentNodeIdState(createdNode.id);
+
+      return { ok: true };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao adicionar nó';
+      setError(msg);
+      return { ok: false, error: msg };
     }
+  }, [currentStory, currentNodeId, nodes])
 
-    const newId = `node-${Date.now()}`;
-
-    const newNode: StoryNode = {
-      id: newId,
-      title: prompt.slice(0, 30),
-      text,
-      createdAt: new Date().toISOString(),
-    };
-
-    const newEdge: StoryEdge = {
-      id: `edge-${Date.now()}`,
-      from: currentNodeId,
-      to: newId,
-      label: prompt.slice(0, 30),
-    };
-
-    setStory((prev) => ({
-      ...prev,
-      nodes: [...prev.nodes, newNode],
-      edges: [...prev.edges, newEdge],
-    }));
-
-    setCurrentNodeId(newId);
-    return { nodeId: newId };
-  };
-
-  const value: StoryContextValue = {
-    currentStory: story,
-    currentNodeId,
-    setCurrentNodeId,
-    addNodeFromPrompt,
-  };
+  const value = useMemo<StoryContextValue>(
+    () => ({
+      currentStory,
+      nodes,
+      edges,
+      currentNodeId,
+      loading,
+      error,
+      setCurrentNodeId,
+      addNodeFromPrompt,
+    }),
+    [currentStory, nodes, edges, currentNodeId, loading, error, addNodeFromPrompt]
+  );
 
   return (
     <StoryContext.Provider value={value}>

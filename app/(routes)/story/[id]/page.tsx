@@ -10,12 +10,18 @@ export default function StoryPage() {
   const { currentStory, currentNodeId, setCurrentNodeId } = useStory();
 
   const currentNode = useMemo(
-    () => currentStory.nodes.find((n) => n.id === currentNodeId), [currentStory, currentNodeId]
+    () => currentStory?.nodes.find((n) => n.id === currentNodeId),
+    [currentStory, currentNodeId]
   )
 
   const outgoingEdges = useMemo(
-    () => currentStory.edges.filter((e) => e.from === currentNodeId), [currentStory, currentNodeId]
+    () => currentStory?.edges.filter((e) => e.from === currentNodeId) ?? [],
+    [currentStory, currentNodeId]
   );
+
+  if (!currentStory) {
+    return <div>Carregando história...</div>;
+  }
 
   if (!currentNode) {
     return (
