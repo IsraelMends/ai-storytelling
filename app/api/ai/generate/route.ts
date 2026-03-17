@@ -32,13 +32,18 @@ const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     messages: [
       {
         role: "system",
-        content:
-          "Você é um escritor criativo. Gere um trecho curto de história (2-4 frases) baseado no prompt. Mantenha o tom narrativo.",
+        content: [
+          "Você é um escritor criativo de histórias interativas.",
+          "Tom: fantasia leve, adequado para todos os públicos.",
+          "Responda sempre em 2 a 4 frases, em português do Brasil.",
+          "Mantenha coerência com o contexto fornecido e continue a narrativa de forma envolvente.",
+          "Evite violência explícita, conteúdo sexual ou temas inadequados.",
+        ].join(" "),
       },
       {
         role: "user",
         content: context
-          ? `Context: ${context}\n\nPrompt: ${prompt}`
+          ? `Contexto atual: ${context}\n\nDecisão do usuário / próximo passo: ${prompt}`
           : prompt,
       },
     ],
