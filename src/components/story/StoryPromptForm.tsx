@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 interface StoryPromptFormProps {
   onSubmit: (prompt: string) => Promise<void>;
@@ -11,6 +12,13 @@ export default function StoryPromptForm({ onSubmit, disabled = false }: StoryPro
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { transcript, isListening, isSupported, startListening } = useSpeechRecognition();
+
+  useEffect(() => {
+    if (transcript) {
+      setPrompt(transcript);
+    }
+  }, [transcript]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +40,7 @@ export default function StoryPromptForm({ onSubmit, disabled = false }: StoryPro
       onSubmit={handleSubmit}
       className="mt-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center"
     >
-      <div className="flex-1">
+      <div className="flex-1 flex gap-2">
         <label htmlFor="story-prompt" className="sr-only">
           Continuar história
         </label>
@@ -45,6 +53,21 @@ export default function StoryPromptForm({ onSubmit, disabled = false }: StoryPro
           placeholder="Digite sua continuação ou decisão..."
           className="w-full rounded-md border border-slate-600 bg-slate-900/40 px-3 py-2 text-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         />
+        {isSupported && (
+          <button
+            type="button"
+            onClick={startListening}
+            disabled={isListening || loading || disabled}
+            className={`px-3 py-2 rounded-md transition-colors ${
+              isListening
+                ? 'bg-red-600 hover:bg-red-500'
+                : 'bg-slate-700 hover:bg-slate-600'
+            } disabled:opacity-60`}
+            title={isListening ? 'Ouvindo...' : 'Falar'}
+          >
+            🎤
+          </button>
+        )}
       </div>
       <button
         type="submit"
