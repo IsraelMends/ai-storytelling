@@ -3,6 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Story, StoryNode, StoryEdge } from '@/types/story';
 import * as storyService from '@/services/storyService';
+import { saveSession, loadSession } from '@/services/indexedDB';
+import toast from 'react-hot-toast';
 
 type StoryContextValue = {
   currentStory: Story | null;
@@ -14,6 +16,7 @@ type StoryContextValue = {
 
   setCurrentNodeId: (id: string) => void;
   addNodeFromPrompt: (prompt: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  createNewStory: () => Promise<void>;
 }
 
 // 3) Criação do contexto
@@ -29,7 +32,7 @@ export function StoryProvider({
   storyId?: string;
 }) {
 
-  const storyId = storyIdProp ?? "COLOQUE_UM_STORY_ID_AQUI";
+  const storyId = storyIdProp;
 
   const [currentStory, setCurrentStory] = useState<Story | null>(null);
   const [nodes, setNodes] = useState<StoryNode[]>([]);
@@ -42,6 +45,11 @@ export function StoryProvider({
     setLoading(true);
     setError(null);
 
+    if (!storyId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await storyService.getStoryById(storyId);
       setCurrentStory({
@@ -51,14 +59,20 @@ export function StoryProvider({
       });
       setNodes(data.nodes);
       setEdges(data.edges);
+
+      // Try to load last position from IndexedDB first
+      const savedNodeId = await loadSession(storyId);
       setCurrentNodeIdState(
+        savedNodeId ??
         data.currentNodeId ??
-          data.nodes.find((n) => n.isStart)?.id ??
-          data.nodes[0]?.id ??
-          null
+        data.nodes.find((n) => n.isStart)?.id ??
+        data.nodes[0]?.id ??
+        null
       );
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Falha ao carregar story');
+      const errorMsg = e instanceof Error ? e.message : 'Falha ao carregar story';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -68,7 +82,32 @@ export function StoryProvider({
     void load();
   }, [load]);
 
+  // Save session to IndexedDB whenever currentNodeId changes
+  useEffect(() => {
+    if (storyId && currentNodeId) {
+      saveSession(storyId, currentNodeId).catch(console.error);
+    }
+  }, [storyId, currentNodeId]);
+
   const setCurrentNodeId = (id: string) => setCurrentNodeIdState(id);
+
+  const createNewStory = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await storyService.createStory({ title: 'Nova História' });
+      setCurrentStory(data.story);
+      setNodes(data.nodes);
+      setEdges(data.edges);
+      setCurrentNodeIdState(data.currentNodeId);
+      toast.success('História criada com sucesso!');
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : 'Falha ao criar história';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   const addNodeFromPrompt: StoryContextValue["addNodeFromPrompt"] = useCallback(async (prompt) => {
     try {
@@ -98,7 +137,11 @@ export function StoryProvider({
       });
 
       const aiJson = await aiRes.json();
-      if (!aiRes.ok) return fail(aiJson?.error ?? 'Falha ao gerar texto');
+      if (!aiRes.ok) {
+        const errorMsg = aiJson?.error ?? 'Falha ao gerar texto';
+        toast.error(errorMsg);
+        return fail(errorMsg);
+      }
 
       //Ajuste esse shape conforme o que sua rota realmente retorno:
       const newTitle = aiJson?.title ?? 'Novo nó';
@@ -121,18 +164,20 @@ export function StoryProvider({
       setCurrentStory((prev) =>
         prev
           ? {
-              ...prev,
-              nodes: [...prev.nodes, createdNode],
-              edges: [...prev.edges, createdEdge],
-            }
+            ...prev,
+            nodes: [...prev.nodes, createdNode],
+            edges: [...prev.edges, createdEdge],
+          }
           : prev
       );
       setCurrentNodeIdState(createdNode.id);
+      toast.success('Novo ramo criado com sucesso!');
 
       return { ok: true };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao adicionar nó';
       setError(msg);
+      toast.error(msg);
       return { ok: false, error: msg };
     }
   }, [currentStory, currentNodeId, nodes])
@@ -147,8 +192,9 @@ export function StoryProvider({
       error,
       setCurrentNodeId,
       addNodeFromPrompt,
+      createNewStory
     }),
-    [currentStory, nodes, edges, currentNodeId, loading, error, addNodeFromPrompt]
+    [currentStory, nodes, edges, currentNodeId, loading, error, addNodeFromPrompt, createNewStory]
   );
 
   return (
