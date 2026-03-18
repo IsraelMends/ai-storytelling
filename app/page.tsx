@@ -7,6 +7,8 @@ import { StoryTree } from '@/components/story-tree/StoryTree'
 import StoryReader from '@/components/story/StoryReader';
 import StoryDecisionButtons from '@/components/story/StoryDecisionButtons';
 import StoryPromptForm from '@/components/story/StoryPromptForm';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 export default function HomePage() {
   const {
@@ -14,6 +16,9 @@ export default function HomePage() {
     currentNodeId,
     setCurrentNodeId,
     addNodeFromPrompt,
+    loading,
+    error,
+    createNewStory,
   } = useStory();
 
   const currentNode = useMemo(
@@ -33,10 +38,32 @@ export default function HomePage() {
     }
   };
 
-  if (!currentStory) {
+  if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 text-slate-50 p-8">
-        <p>Carregando história...</p>
+        <LoadingSpinner message="Carregando história..." />
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 p-8">
+        <ErrorState message={error} onRetry={() => window.location.reload()} />
+      </main>
+    );
+  }
+
+  if (!currentStory) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 p-8 flex flex-col items-center justify-center gap-4">
+        <p className="text-slate-400">Nenhuma história encontrada.</p>
+        <button
+          onClick={createNewStory}
+          className="px-6 py-3 bg-sky-600 rounded-lg hover:bg-sky-500 transition-colors font-medium"
+        >
+          Criar Nova História
+        </button>
       </main>
     );
   }
@@ -44,7 +71,7 @@ export default function HomePage() {
   if (!currentNode) {
     return (
       <main className="min-h-screen bg-slate-950 text-slate-50 p-8">
-        <p>História em estado inválido!</p>
+        <ErrorState message="História em estado inválido!" onRetry={() => window.location.reload()} />
       </main>
     );
   }

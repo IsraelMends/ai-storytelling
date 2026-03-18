@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { StoryProvider } from "../src/contexts/StoryContext";
+import { ToastProvider } from "../src/components/ui/ToastProvider";
 
 export const metadata: Metadata = {
   title: "AI Storytelling",
@@ -18,7 +19,9 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body style={{ minHeight: "100vh", background: "#f1f5f9" }}>
         <StoryProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </StoryProvider>
       </body>
     </html>
