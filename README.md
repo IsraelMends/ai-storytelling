@@ -47,7 +47,7 @@ Cada decisão leva a caminhos diferentes. Cada prompt pode dar origem a novos tr
 - **TypeScript** — Tipagem estática
 - **Tailwind CSS 4** — Estilos
 - **React Flow** — Grafo interativo
-- **OpenAI API** — Geração de texto (GPT-4o-mini)
+- **OpenRouter API** — Geração de texto (LLMs via OpenRouter)
 
 ---
 
@@ -71,13 +71,19 @@ npm install
 
 ### Configuração (para geração com IA)
 
-Crie um arquivo `.env.local` na raiz do projeto:
-
-```env
-AI_API_KEY=sua_chave_openai
+1. Copie o arquivo de exemplo:
+```bash
+cp .env.example .env.local
 ```
 
-> Obtenha uma chave em [platform.openai.com](https://platform.openai.com/api-keys). Sem ela, o app funciona normalmente para leitura e navegação; a geração de novos nós ficará indisponível.
+2. Edite `.env.local` com suas credenciais:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/ai_storytelling"
+OPENROUTER_API_KEY="sk-or-xxxxxxxxxxxxxxxxxxxxxxxx"
+OPENROUTER_MODEL="meta-llama/llama-3.1-8b-instruct:free"
+```
+
+> Obtenha uma chave OpenRouter em [openrouter.ai/keys](https://openrouter.ai/keys). Sem ela, a geração de novos nós via IA ficará indisponível, mas leitura e navegação funcionam normalmente.
 
 ### Execução
 
